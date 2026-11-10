@@ -11,7 +11,10 @@ StreamLit slope fitting
 """
 
 
+import io
+
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 
@@ -73,16 +76,102 @@ def logarithmicDerivative(time,pressure,log_cycle_fraction):
             
     return derivative
 
+def load_csv(uploaded_file):
+    '''Reads a time/pressure CSV and returns (DataFrame, p_i or None).
+
+    Expected format (header row required, '#' lines are comments):
+        # p_i = 1930            <- optional: initial pressure, psia
+        time_hr,pressure_psia
+        0.005,1915.78
+        ...
+    Column names are flexible; the user picks them in the app.
+    '''
+    text = uploaded_file.getvalue().decode("utf-8-sig")
+    p_i = None
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("#") and "p_i" in line.lower() and "=" in line:
+            try:
+                p_i = float(line.split("=", 1)[1])
+            except ValueError:
+                pass
+    df = pd.read_csv(io.StringIO(text), comment="#", skipinitialspace=True)
+    df.columns = [str(c).strip() for c in df.columns]
+    return df, p_i
+
+
+def guess_column(columns, keywords, fallback):
+    '''Returns the index of the first column whose name contains a keyword.'''
+    for i, c in enumerate(columns):
+        if any(k in c.lower() for k in keywords):
+            return i
+    return fallback
+
+
+def clean_data(time, pressure):
+    '''Drops NaN/non-positive times, sorts by time and removes duplicate times.'''
+    mask = np.isfinite(time) & np.isfinite(pressure) & (time > 0)
+    time, pressure = time[mask], pressure[mask]
+    order = np.argsort(time, kind="stable")
+    time, pressure = time[order], pressure[order]
+    time, unique_idx = np.unique(time, return_index=True)
+    return time, pressure[unique_idx]
+
+
 st.title("Log-log Plot - Slope Fiting")
 
+# ---------------------------------------------------------------------------
+# Data source: built-in example or user CSV
+# ---------------------------------------------------------------------------
+st.sidebar.header("Data")
+uploaded = st.sidebar.file_uploader(
+    "Upload time/pressure CSV", type=["csv", "txt"],
+    help="CSV with a header row, e.g. 'time_hr,pressure_psia'. "
+         "Optional first line '# p_i = 1930' sets the initial pressure.")
+log_cycle_fraction = st.sidebar.slider(
+    "Derivative smoothing (log-cycle fraction L)", 0.01, 0.5, 0.1, 0.01)
 
-time_data = np.array([0.005,0.0106,0.017,0.0241,0.0321,0.0411,0.0512,0.0626,0.0755,0.0899,0.1061,0.1244,0.1449,0.1681,0.1941,0.223,0.256,0.293,0.335,0.382,0.435,0.494,0.561,0.636,0.72,0.815,0.922,1.042,1.178,1.33,1.501,1.694,1.91,2.154,2.428,2.737,3.084,3.474,3.914,4.408,4.964,5.589,6.293,7.085,7.975,8.977,10.1,11.37,12.8,14.4,16.21,18.24,20.53,23.1,25.99,29.24,32.9,37.02,41.65,46.86,52.73,59.32,66.74,72])
-pressure_data = np.array([1915.78,1902.13,1888.64,1875.96,1864.29,1853.57,1843.77,1835.07,1827.67,1821.33,1815.91,1811.71,1808.05,1805.05,1802.93,1800.97,1799.43,1797.77,1796.77,1795.37,1794.52,1793.3,1792.26,1791.22,1790.33,1789.49,1788.81,1787.79,1786.91,1786.03,1785.14,1784.61,1783.64,1782.78,1782.06,1781.18,1780.65,1779.54,1778.93,1778.21,1777.36,1776.6,1775.71,1774.85,1774.08,1773.25,1772.31,1771.28,1770.46,1769.4,1768.32,1767.14,1765.98,1764.75,1763.21,1761.86,1760.29,1758.76,1757.2,1755.29,1753.34,1751.19,1749.15,1747.51])
-p_i = 1930 # psia
-DeltaP = p_i - pressure_data
+csv_p_i = None
+if uploaded is not None:
+    try:
+        df, csv_p_i = load_csv(uploaded)
+    except Exception as e:
+        st.error(f"Could not read CSV: {e}")
+        st.stop()
+    if df.shape[1] < 2:
+        st.error("The CSV needs at least two columns (time and pressure).")
+        st.stop()
+    cols = list(df.columns)
+    t_col = st.sidebar.selectbox("Time column", cols,
+                                 index=guess_column(cols, ["time", "hr", "t"], 0))
+    p_col = st.sidebar.selectbox("Pressure column", cols,
+                                 index=guess_column(cols, ["pres", "psi", "p"], 1))
+    time_raw = pd.to_numeric(df[t_col], errors="coerce").to_numpy(dtype=float)
+    pres_raw = pd.to_numeric(df[p_col], errors="coerce").to_numpy(dtype=float)
+    time_data, pressure_data = clean_data(time_raw, pres_raw)
+    dropped = len(time_raw) - len(time_data)
+    st.sidebar.caption(f"{uploaded.name}: {len(time_data)} points used"
+                       + (f", {dropped} dropped (blank/non-numeric/t≤0/duplicate)" if dropped else ""))
+    if len(time_data) < 3:
+        st.error("Need at least 3 valid points to compute the derivative.")
+        st.stop()
+else:
+    st.sidebar.caption("Using built-in example data.")
+    time_data = np.array([0.005,0.0106,0.017,0.0241,0.0321,0.0411,0.0512,0.0626,0.0755,0.0899,0.1061,0.1244,0.1449,0.1681,0.1941,0.223,0.256,0.293,0.335,0.382,0.435,0.494,0.561,0.636,0.72,0.815,0.922,1.042,1.178,1.33,1.501,1.694,1.91,2.154,2.428,2.737,3.084,3.474,3.914,4.408,4.964,5.589,6.293,7.085,7.975,8.977,10.1,11.37,12.8,14.4,16.21,18.24,20.53,23.1,25.99,29.24,32.9,37.02,41.65,46.86,52.73,59.32,66.74,72])
+    pressure_data = np.array([1915.78,1902.13,1888.64,1875.96,1864.29,1853.57,1843.77,1835.07,1827.67,1821.33,1815.91,1811.71,1808.05,1805.05,1802.93,1800.97,1799.43,1797.77,1796.77,1795.37,1794.52,1793.3,1792.26,1791.22,1790.33,1789.49,1788.81,1787.79,1786.91,1786.03,1785.14,1784.61,1783.64,1782.78,1782.06,1781.18,1780.65,1779.54,1778.93,1778.21,1777.36,1776.6,1775.71,1774.85,1774.08,1773.25,1772.31,1771.28,1770.46,1769.4,1768.32,1767.14,1765.98,1764.75,1763.21,1761.86,1760.29,1758.76,1757.2,1755.29,1753.34,1751.19,1749.15,1747.51])
+    csv_p_i = 1930.0  # psia
 
-# Calculate the derivative using a log cycle fraction of 0.1
-derivs = logarithmicDerivative(time_data, DeltaP, log_cycle_fraction=0.1)
+# Initial pressure: from the CSV '# p_i =' line if present, editable by the user
+default_p_i = csv_p_i if csv_p_i is not None else float(np.max(pressure_data))
+p_i = st.sidebar.number_input("Initial pressure p_i (psia)", value=float(default_p_i))
+DeltaP = np.abs(p_i - pressure_data)   # abs() handles drawdown and buildup
+
+# Calculate the Bourdet derivative
+derivs = logarithmicDerivative(time_data, DeltaP, log_cycle_fraction=log_cycle_fraction)
+
+with st.expander("Data table"):
+    st.dataframe(pd.DataFrame({"time_hr": time_data, "pressure_psia": pressure_data,
+                               "DeltaP_psi": DeltaP, "derivative_psi": derivs}))
 
 
 x0 = np.zeros((4))
@@ -114,7 +203,7 @@ ax.plot(time_data, nHalfSlope, '--b', linewidth=2, label='1/2 slope')
 ax.plot(time_data, nQuarterSlope, '--g', linewidth=2, label='1/4 slope')
 ax.plot(time_data, nNegHalfSlope, '--y', linewidth=2, label='-1/2 slope')
 ax.set_xlabel('Time (hr)',fontsize='12',fontweight='bold', fontname='Verdana')
-ax.set_ylabel('$\Delta$Pressure (psia)',fontsize='12',fontweight='bold',fontname='Verdana')
+ax.set_ylabel(r'$\Delta$Pressure (psia)',fontsize='12',fontweight='bold',fontname='Verdana')
 ax.set_xscale('log')
 ax.set_yscale('log')
 ax.set_title("Log-Log Plot")
