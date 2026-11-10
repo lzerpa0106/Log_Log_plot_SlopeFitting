@@ -125,3 +125,4 @@ for tick in ax.get_xticklabels():
 for tick in ax.get_yticklabels():
     tick.set_fontname('Verdana')
 ax.grid(True)  
+st.pyplot(fig)
