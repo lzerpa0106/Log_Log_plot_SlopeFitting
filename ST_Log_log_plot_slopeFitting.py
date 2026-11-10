@@ -85,7 +85,7 @@ DeltaP = p_i - pressure_data
 derivs = logarithmicDerivative(time_data, DeltaP, log_cycle_fraction=0.1)
 
 
-x0 = np.zeros((2))
+x0 = np.zeros((4))
 x0[0] = st.slider("Horizontal line", 0.0, 15.0, 1.0)
 x0[1] = st.slider("1/2 Slope", 0.0, 15.0, 1.0)
 x0[2] = st.slider("1/4 Slope", 0.0, 15.0, 1.0)
