@@ -174,7 +174,7 @@ with st.expander("Data table"):
                                "DeltaP_psi": DeltaP, "derivative_psi": derivs}))
 
 
-x0 = np.zeros((4))
+x0 = np.zeros((5))
 x0[0] = st.slider("Horizontal line", 0.0, 50.0, 1.0)
 x0[1] = st.slider("Unit Slope", 0.0, 50.0, 1.0)
 x0[2] = st.slider("1/2 Slope", 0.0, 50.0, 1.0)
