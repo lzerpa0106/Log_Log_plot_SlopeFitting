@@ -176,7 +176,7 @@ with st.expander("Data table"):
 
 x0 = np.zeros((5))
 x0[0] = st.slider("Horizontal line", 0.0, 50.0, 1.0)
-x0[1] = st.slider("Unit Slope", 0.0, 50.0, 1.0)
+x0[1] = st.slider("Unit Slope", 0.0, 100.0, 1.0)
 x0[2] = st.slider("1/2 Slope", 0.0, 50.0, 1.0)
 x0[3] = st.slider("1/4 Slope", 0.0, 50.0, 1.0)
 x0[4] = st.slider("-1/2 Slope", 0.0, 50.0, 1.0)
