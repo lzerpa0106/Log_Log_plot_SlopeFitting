@@ -176,21 +176,25 @@ with st.expander("Data table"):
 
 x0 = np.zeros((4))
 x0[0] = st.slider("Horizontal line", 0.0, 50.0, 1.0)
-x0[1] = st.slider("1/2 Slope", 0.0, 50.0, 1.0)
-x0[2] = st.slider("1/4 Slope", 0.0, 50.0, 1.0)
-x0[3] = st.slider("-1/2 Slope", 0.0, 50.0, 1.0)
+x0[1] = st.slider("Unit Slope", 0.0, 50.0, 1.0)
+x0[2] = st.slider("1/2 Slope", 0.0, 50.0, 1.0)
+x0[3] = st.slider("1/4 Slope", 0.0, 50.0, 1.0)
+x0[4] = st.slider("-1/2 Slope", 0.0, 50.0, 1.0)
 
 
 nZerob = x0[0]
 nZeroSlope = nZerob*np.ones(np.size(time_data))
 
-nHalfb = x0[1]
+nUnitb = x0[1]
+nUnitSlope = nUnitb*time_data
+
+nHalfb = x0[2]
 nHalfSlope = nHalfb*time_data**0.5
 
-nQuarterb = x0[2]
+nQuarterb = x0[3]
 nQuarterSlope = nQuarterb*time_data**0.25
 
-nNegHalfb = x0[3]
+nNegHalfb = x0[4]
 nNegHalfSlope = nNegHalfb*time_data**(-0.5)
 
       
@@ -199,6 +203,7 @@ fig, ax = plt.subplots(figsize=(8, 5))  # Create a figure containing a single ax
 ax.plot(time_data,DeltaP,'ob',label='Pressure') # Plot data on the axes.
 ax.plot(time_data, derivs, 'xr', label='Log Derivative')
 ax.plot(time_data, nZeroSlope, '--r', linewidth=2, label='Horizontal line')
+ax.plot(time_data, nUnitSlope, '--c', linewidth=2, label='Unit Slope')
 ax.plot(time_data, nHalfSlope, '--b', linewidth=2, label='1/2 slope')
 ax.plot(time_data, nQuarterSlope, '--g', linewidth=2, label='1/4 slope')
 ax.plot(time_data, nNegHalfSlope, '--y', linewidth=2, label='-1/2 slope')
@@ -214,4 +219,5 @@ for tick in ax.get_xticklabels():
 for tick in ax.get_yticklabels():
     tick.set_fontname('Verdana')
 ax.grid(True)  
+ax.legend()
 st.pyplot(fig)
